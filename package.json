@@ -11,5 +11,8 @@
     "url": "git@gitlab.presidio.com:stephentotten/student-management-mongodb.git"
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "mongodb": "^6.1.0"
+  }
 }
