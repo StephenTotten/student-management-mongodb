@@ -209,28 +209,26 @@ async function updateStudent(collection, oldName, newName, newAge) {
     }
 }
 
+async function deleteStudent(deleteName, collection) {
+    try {
+      const result = await collection.deleteOne({ name: deleteName });
   
-  function deleteStudent(studentList, deleteName) {
-    const query = 'DELETE FROM student WHERE name = ?';
-    connection.query(query, [deleteName], (err, result) => {
-      if (err) {
-        console.error('Error deleting student from database: ' + err.message);
-        return;
+      if (result.deletedCount === 1) {
+        // Check if one document was deleted
+        console.log('Student deleted from database.');
+        // Remove the student from the local studentList if needed
+        const deletedStudentIndex = studentList.findIndex(student => student.name === deleteName);
+        if (deletedStudentIndex !== -1) {
+          studentList.splice(deletedStudentIndex, 1);
+        }
+      } else {
+        console.log('Student not found in the database.');
       }
-  
-      if (result.affectedRows === 0) {
-        console.log('Student not found');
-        return;
-      }
-  
-      // Update the local studentList only if the database delete operation succeeds
-      const updatedStudentList = studentList.filter(student => student.name !== deleteName);
-      studentList.length = 0; // Clear the existing studentList
-      Array.prototype.push.apply(studentList, updatedStudentList); // Copy the updated list back
-  
-      console.log('Student deleted from database.');
-    });
+    } catch (err) {
+      console.error('Error deleting student from database: ' + err.message);
+    }
   }
+  
 
 function printStudents(studentList) {
     for (const student of studentList) {
@@ -254,22 +252,6 @@ function searchStudentByName(studentList, name) {
     } else {
         console.log('Student not found');
     }
-}
-
-async function saveStudentsToDatabase() {
-  try {
-    const values = studentList.map((student) => [student.name, student.age]);
-    const query = 'INSERT INTO student (name, age) VALUES ?';
-    connection.query(query, [values], (err) => {
-      if (err) {
-        console.error('Error saving students to database: ' + err.message);
-        return;
-      }
-      console.log('Changes saved to database');
-    });
-  } catch (err) {
-    console.error('Error saving students to database: ' + err.message);
-  }
 }
 
 process.on('SIGINT', () => {
