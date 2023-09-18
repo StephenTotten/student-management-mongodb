@@ -1,5 +1,5 @@
 const readline = require('readline');
-const { MongoClient, ObjectId } = require('mongodb');
+const { MongoClient, ObjectId, ServerApiVersion } = require('mongodb');
 const Student = require('./student');
 const studentList = [];
 
@@ -26,17 +26,18 @@ async function run() {
 }
 
 async function connectToDatabase() {
-  const client = new MongoClient(uri, { useUnifiedTopology: true });
-  try {
-    await client.connect();
-    const db = client.db(dbName);
-    const collection = db.collection(collectionName);
-    return { client, db, collection };
-  } catch (err) {
-    console.error('Error connecting to MongoDB: ' + err.message);
-    process.exit(1);
+    const client = new MongoClient(uri, { useUnifiedTopology: true });
+    try {
+      await client.connect();
+      const db = client.db(dbName);
+      const collection = db.collection(collectionName);
+      console.log('Connected to the database:', dbName, collectionName); // Debug statement
+      return { client, db, collection };
+    } catch (err) {
+      console.error('Error connecting to MongoDB: ' + err.message);
+      process.exit(1);
+    }
   }
-}
 async function askQuestion(rl, question) {
     return new Promise((resolve) => {
         rl.question(question, resolve);
@@ -75,17 +76,15 @@ async function promptUser(collection) {
             // Add student
             const name = await askQuestion(rl, 'Enter student name: ');
             const age = parseInt(await askQuestion(rl, 'Enter student age: '));
-            addStudent(name, age);
-            rl.close();
-            await promptUser();
+            await addStudent(name, age, collection); // Call the addStudent function with the collection
+            rl.close(); // Close readline interface
             break;
 
         case 2:
             // Delete student
             const deleteName = await askQuestion(rl, 'Enter student name to delete: ');
             deleteStudent(studentList, deleteName);
-            rl.close();
-            await promptUser();
+            rl.close(); // Close readline interface
             break;
 
         case 3:
@@ -94,8 +93,7 @@ async function promptUser(collection) {
             const newName = await askQuestion(rl, 'Enter new name: ');
             const newAge = parseInt(await askQuestion(rl, 'Enter new age: '));
             updateStudent(studentList, oldName, newName, newAge);
-            rl.close();
-            await promptUser();
+            rl.close(); // Close readline interface
             break;
 
         case 4:
@@ -110,47 +108,48 @@ async function promptUser(collection) {
                     // Search by name
                     const searchName = await askQuestion(rl, 'Enter student name to search: ');
                     searchStudentByName(studentList, searchName);
-                    rl.close();
-                    await promptUser();
                     break;
 
                 case 2:
                     // Search by ID
                     const searchID = parseInt(await askQuestion(rl, 'Enter student ID to search: '));
                     searchStudentByID(studentList, searchID);
-                    rl.close();
-                    await promptUser();
                     break;
 
                 default:
                     console.log('Invalid search option. Please try again.');
-                    rl.close();
-                    await promptUser();
                     break;
             }
+            rl.close(); // Close readline interface
             break;
 
         case 5:
             // Print all students
             printStudents(studentList);
-            rl.close();
-            await promptUser();
+            rl.close(); // Close readline interface
             break;
 
         case 6:
             // Exit and save to file
             //await saveStudentsToDatabase();
             console.log('Exiting...');
-            rl.close();
+            rl.close(); // Close readline interface
             process.exit();
+            break;
 
         default:
             console.log('Invalid choice. Please try again.');
-            rl.close();
-            await promptUser();
+            rl.close(); // Close readline interface
             break;
     }
+
+    // Call promptUser again to continue the interaction
+    await promptUser(collection);
+
+    // Close readline interface outside the switch
+    rl.close();
 }
+
 
 async function loadStudentsFromDatabase(collection) {
   try {
@@ -166,43 +165,50 @@ async function loadStudentsFromDatabase(collection) {
   }
 }
 
-function addStudent(name, age) {
-    const query = 'INSERT INTO student (name, age) VALUES (?, ?)';
-    connection.query(query, [name, age], (err, result) => {
-      if (err) {
-        console.error('Error adding student to database: ' + err.message);
-        return;
-      }
-  
-      const newStudent = new Student(name, age, result.insertId); // Capture the auto-generated ID
+async function addStudent(name, age, collection) {
+    try {
+      const result = await collection.insertOne({ name, age });
+      const newStudent = new Student(name, age, result.insertedId); // Capture the auto-generated ID
   
       // Only push the student into the array after a successful database insertion
       studentList.push(newStudent);
   
-      console.log('Student added to database with ID: ' + result.insertId);
-    });
-  }
+      console.log('Student added to database with ID: ' + result.insertedId);
+    } catch (err) {
+      console.error('Error adding student to database: ' + err.message);
+    }
+}
+
   
-  async function updateStudent(studentList, oldName, newName, newAge) {
-    const query = 'UPDATE student SET name = ?, age = ? WHERE name = ?';
-    connection.query(query, [newName, newAge, oldName], (err, result) => {
-      if (err) {
-        console.error('Error updating student in database: ' + err.message);
-        return;
-      }
-  
-      // Update the local studentList only if the database update succeeds
-      for (const student of studentList) {
-        if (student.name === oldName) {
-          student.name = newName;
-          student.age = newAge;
-          break;
+async function updateStudent(collection, oldName, newName, newAge) {
+    try {
+        const result = await collection.updateOne(
+            { name: oldName },
+            {
+                $set: {
+                    name: newName,
+                    age: newAge,
+                },
+            }
+        );
+
+        if (result.modifiedCount === 1) {
+            // Check if one document was modified
+            console.log('Student updated in database.');
+            // Update the local studentList if needed
+            const updatedStudent = studentList.find(student => student.name === oldName);
+            if (updatedStudent) {
+                updatedStudent.name = newName;
+                updatedStudent.age = newAge;
+            }
+        } else {
+            console.log('Student not found or no changes made.');
         }
-      }
-  
-      console.log('Student updated in database.');
-    });
-  }
+    } catch (err) {
+        console.error('Error updating student in database: ' + err.message);
+    }
+}
+
   
   function deleteStudent(studentList, deleteName) {
     const query = 'DELETE FROM student WHERE name = ?';
