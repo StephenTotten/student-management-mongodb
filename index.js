@@ -83,7 +83,7 @@ async function promptUser(collection) {
         case 2:
             // Delete student
             const deleteName = await askQuestion(rl, 'Enter student name to delete: ');
-            deleteStudent(studentList, deleteName);
+            deleteStudent(deleteName, collection);
             rl.close(); // Close readline interface
             break;
 
