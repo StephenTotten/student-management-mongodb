@@ -92,7 +92,7 @@ async function promptUser(collection) {
             const oldName = await askQuestion(rl, 'Enter student name to update: ');
             const newName = await askQuestion(rl, 'Enter new name: ');
             const newAge = parseInt(await askQuestion(rl, 'Enter new age: '));
-            updateStudent(studentList, oldName, newName, newAge);
+            updateStudent(collection, oldName, newName, newAge);
             rl.close(); // Close readline interface
             break;
 
